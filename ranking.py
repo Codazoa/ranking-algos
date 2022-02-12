@@ -2,45 +2,128 @@ import getopt, sys
 from os.path import exists
 import math
 import csv
+from functools import reduce
 
 class TF_IDF(object):
     """ docstring """
     def __init__(self, dataFile):
-        self.termIndex = {}
-        pass
+        self.fp = open(dataFile, 'r') # open the csv file
+        self.csvData = csv.reader(self.fp) # create a csv reader object
+        self.termFreq = {} # calculating term frequencies {'id': [('term', num)]}
+        self.docTerms = {} # number of terms in each document {'id': num}
+        self.termIndex = {} # inverted index connecting terms to documents {'term': ['id', 'id']}
 
-    def rankQuery(self, Q, k):
-        self.tf_idf(Q, k)
+        for row in self.csvData:
+            docId = row[0] # store the docID of current row
+            terms = row[1].split() # split the words to count and convert later
+
+            self.termFreq[docId] = [] # initialize this document's list
+
+            self.docTerms[docId] = len(terms) # calculate number of terms in each document
+            termSet = set(terms) # convert to set to count individual words
+            for term in termSet: # count occurances of each distinct word
+                # check if we have this term in the index and add the docID
+                if(term not in self.termIndex): self.termIndex[term] = [docId]
+                else: self.termIndex[term].append(docId)
+
+                self.termFreq[docId].append((term, row[1].count(term))) # append a new tuple to document's list
+
+        self.fp.close()
+
+    def __getDocsForQuery(self, query): # return list of docId's that correspond to each word in query
+        docList = [] # list to hold the docID's
+        for term in set(query.split()): # step though each term in the query
+            docList = docList + (self.termIndex.get(term)[:])
+        return sorted(set(docList)) # cast to set to get distinct values then sort back to a list
 
     def tf_idf(self, Q, k):
-        print(f'Using TF_IDF on {Q} {k}')
-        pass
+        relList = [] # list of relevance tuples we will return
+        docIDList = self.__getDocsForQuery(Q) # get a list of all documents that contain the query terms
+
+        for doc in docIDList:
+            relList.append((doc, self.relevance(doc, Q)))
+
+        relList.sort(reverse=True, key=self.__sortRels)
+
+        return relList[:k]
 
     def relevance(self, d, Q):
-        pass
+        terms = Q.lower().split() # convert words to lower case single words
+        if(len(terms) == 1):
+            return self.tf(d, Q) / self.__numDocs(Q)
+
+        rel = map( lambda x: self.tf(d, x) / self.__numDocs(x), terms)
+        return (reduce( lambda x, y: x + y, rel))
 
     def tf(self, d, t):
-        return math.log(1 + (__docFreq(d, t)/__numTerms(d)))
+        return math.log(1 + (self.__docFreq(d, t)/self.__numTerms(d)))
 
     def __docFreq(self, d, t):
-        pass
+        # return number of times term t occurs in document d
+        termList = self.termFreq.get(d)
+        for tuple in termList:
+            if tuple[0] == t:
+                return tuple[1]
+        return 0
 
     def __numTerms(self, d):
-        pass
+        # return number of terms in the document
+        return self.docTerms.get(d)
 
+    def __numDocs(self, t):
+        # return number of documents containing t
+        return len(self.termIndex[t])
+
+    def __sortRels(self, tup):
+        return tup[1]
+
+    def rankQuery(self, Q, k):
+        list = self.tf_idf(Q, k)
+        return list
 
 class BM_25(object):
     """ docstring """
     def __init__(self, dataFile):
+        self.kVal1 = 1.2
+        self.kVal2 = 500
+        self.bVal = 0.75
+
+        self.fp = open(dataFile, 'r') # open the csv file
+        self.csvData = csv.reader(self.fp) # create a csv reader object
+        self.termFreq = {} # calculating term frequencies {'id': [('term', num)]}
+        self.docTerms = {} # number of terms in each document {'id': num}
+        self.termIndex = {} # inverted index connecting terms to documents {'term': ['id', 'id']}
+
+        for row in self.csvData:
+            docId = row[0] # store the docID of current row
+            terms = row[1].split() # split the words to count and convert later
+
+            self.termFreq[docId] = [] # initialize this document's list
+
+            self.docTerms[docId] = len(terms) # calculate number of terms in each document
+            termSet = set(terms) # convert to set to count individual words
+            for term in termSet: # count occurances of each distinct word
+                # check if we have this term in the index and add the docID
+                if(term not in self.termIndex): self.termIndex[term] = [docId]
+                else: self.termIndex[term].append(docId)
+
+                self.termFreq[docId].append((term, row[1].count(term))) # append a new tuple to document's list
+
+        self.fp.close()
+
+    def bm25(self, query, k):
+        print(f'Using BM_25 on {Q} {k}')
+        terms = query.lower().split() # split up the terms and convert to lower case
         pass
+
+    def __numOfDocs(self):
+        # return number of documents in corpus
+
+
 
     def rankQuery(self, Q, k):
-        self.bm25(Q, k)
-
-    def bm25(self, Q, k):
-        print(f'Using BM_25 on {Q} {k}')
-        pass
-
+        list = self.bm25(Q, k)
+        return list
 
 def main(argv = sys.argv[1:]):
 
@@ -91,10 +174,10 @@ def main(argv = sys.argv[1:]):
     # loop to get input from user
     while True:
         # get query and number of results to show from user
-        query = input('\nEnter query to search:\t(--exit to exit) \n')
+        query = input('\nEnter query to search:\t(--exit to exit)\n-> ')
         if(query == '--exit'): # exit input and program
             return
-        results = input('Enter number of results to show? \n')
+        results = input('Enter number of results to show?\n-> ')
         print()
 
         # make sure results is actually a number
@@ -103,14 +186,10 @@ def main(argv = sys.argv[1:]):
             continue
 
         # calcualte rank for the query
-        print(rank.rankQuery(query, results))
+        relevance = rank.rankQuery(query, int(results))
+        for rel in relevance:
+            print(rel)
 
-
-
-
-
-
-    pass
 
 if __name__ == '__main__':
     main()
